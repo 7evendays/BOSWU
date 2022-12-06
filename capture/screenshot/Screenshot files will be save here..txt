@@ -1,0 +1,2 @@
+스크린샷 이미지들이 이곳에 저장됩니다.
+Screenshot files will be save here.

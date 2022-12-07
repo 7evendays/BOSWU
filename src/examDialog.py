@@ -28,14 +28,14 @@ alert_two = 0
 alert_int = 0
 yellowcard = 0
 protocols = {1: 'ICMP', 6: 'TCP', 17:'UDP'}
-global pre_time, pkt_cnt, pre_cnt, cap, approv, chk, start_time
+global pre_time, pkt_cnt, cap, approv, chk
 pre_time = datetime.now()
 pkt_cnt = 0
-pre_cnt = 0
 lock = threading.Lock()
 approv = False
 cap = False
 chk = 0
+ip_list = set()
 HOST = socket.gethostbyname(socket.gethostname())
 with open("firebase/auth.json") as f:
             config = json.load(f)
@@ -44,8 +44,6 @@ firebase = pyrebase.initialize_app(config)
 auth = firebase.auth()
 # Get a reference to the database service
 db = firebase.database()
-global group
-group = False
 
 class ExamDialog(QDialog):
     def __init__(self):
@@ -279,7 +277,7 @@ class ExamDialog(QDialog):
                                 #mp_drawing.draw_detection(frame, detection)
                             if len(d_results.detections) >= 2: # 사람 2명 이상
                                 if ((datetime.now() - t_alert_time).seconds) > 10:                                #self.save_img() # 이미지 저장을 원하면 주석 해제
-                                    self.save_mp4() # 동영상 저장을 원하면 주석 해제
+                                    self.save_mp4(0) # 동영상 저장을 원하면 주석 해제
                                     alert_two += 0.4
                                     log_msg = "외부인이 감지됐습니다."
                                     time = datetime.now().strftime("%Y-%m-%d(%H:%M:%S)")
@@ -291,7 +289,7 @@ class ExamDialog(QDialog):
                         else: # 사람 없음
                             if ((datetime.now() - e_alert_time).seconds) > 10:
                                 #self.save_img() # 이미지 저장을 원하면 주석 해제
-                                self.save_mp4() # 동영상 저장을 원하면 주석 해제
+                                self.save_mp4(0) # 동영상 저장을 원하면 주석 해제
                                 alert_emp += 0.4
                                 log_msg = "자리를 비우지 마세요."
                                 time = datetime.now().strftime("%Y-%m-%d(%H:%M:%S)")
@@ -366,12 +364,12 @@ class ExamDialog(QDialog):
                 self.camLabel.setPixmap(QPixmap(image))
                 self.camLabel.setScaledContents(True) # 레이블이 사용 가능한 모든 공간을 채우기 위해 내용의 크기를 조정할지를 설정
                 
-                global cap, alert_int
+                global cap, alert_int, lock
 
-                #lock.acquire()
-                #threading.Thread(target = self.pktcap).start()
-                #lock.release()
-                #threading.Thread(target = self.printcnt).start()
+                lock.acquire()
+                threading.Thread(target = self.pktcap).start()
+                lock.release()
+                threading.Thread(target = self.chkcnt).start()
 
                 if cap == True:
                     cap_time = datetime.now().strftime("%Y-%m-%d(%H-%M-%S)")
@@ -386,11 +384,6 @@ class ExamDialog(QDialog):
                     self.alertListWidget.scrollToBottom()
                     self.alert_show()
                     cap = False
-
-                global group
-                if group == True:
-                    self.save_mp4()
-                    group = False
 
                 if cv2.waitKey(10) == ord('q'):
                     self.endWebcam()
@@ -425,19 +418,27 @@ class ExamDialog(QDialog):
             msg.setWindowTitle("알림")
             msg.setIconPixmap(QPixmap(img_path + "warning.png").scaled(40, 40))
             msg.setText("경고")
-            msg.setInformativeText("같은 장소에 타응시생이 있음이 감지되어 감독관에게 알림이 갔습니다.\n"
-                                   "지금부터 카메라를 이용하여 주변을 360도 각도로 촬영하여 사람이 없음을 녹화해주세요."
+            msg.setInformativeText("유사한 장소에 타응시생이 있음이 감지되어 감독관에게 알림이 갔습니다.\n"
+                                   "지금부터 카메라를 이용하여 주변을 360도 각도로 촬영하여 사람이 없음을 녹화해주세요.\n"
                                    "OK 버튼을 누르면 자동으로 10초간 녹화가 진행됩니다.\n"
                                    "※ 녹화를 하지 않을 시 추후에 불이익이 발생할 수 있습니다.")
             msg.exec_()
-            global group
-            group = True
+            self.save_mp4(1)
+            msg.setIconPixmap(QPixmap(img_path + "success.png").scaled(40, 40))
+            msg.setText("알림")
+            msg.setInformativeText("녹화가 완료되었습니다.")
+            msg.exec_()
+            log_msg = "유사한 장소에 타응시생이 있음이 감지되어 감독관에게 알림이 갔습니다."
+            time = datetime.now().strftime("%Y-%m-%d(%H:%M:%S)")
+            log_list.append([time, log_msg])
+            self.alertListWidget.addItem(time + " " + log_msg) # 기록 추가
+            self.alertListWidget.scrollToBottom()
 
     def pktcap(self):
         sniff(filter = "ip", prn = self.cntpacket, count = 5)
 
     def cntpacket(self, packet):
-        global pkt_cnt, pre_time, approv, HOST, start_time
+        global pkt_cnt, pre_time, approv, HOST, ip_list
         src_ip = packet[0][1].src
         dst_ip = packet[0][1].dst
         proto = packet[0][1].proto
@@ -461,32 +462,33 @@ class ExamDialog(QDialog):
                         approv = True
                     else:
                         pkt_cnt += 1
+                        ip_list.add(src_ip)
                         approv = False
 
-    def printcnt(self):
-        global pkt_cnt, pre_cnt, pre_time, cap, approv, chk
+    def chkcnt(self):
+        global pkt_cnt, pre_time, cap, approv, chk
         time = datetime.now()
 
-        if (time - pre_time).seconds > 1:
+        if (time - pre_time).seconds > 2:
             print(pkt_cnt)
             
             if approv == True:
                 approv = False
             else:
-                if pkt_cnt > 140:
+                if pkt_cnt > 150:
                     chk += 4
                 elif pkt_cnt > 110:
-                    chk += 3
-                elif pkt_cnt > 80:
                     chk += 2
-                elif pkt_cnt > 60:
+                elif pkt_cnt > 75:
                     chk += 1.5
                 elif pkt_cnt > 30:
                     chk += 1
+                elif pkt_cnt > 20:
+                    pkt_cnt -= 0.2
                 else:
                     chk = 0
 
-                if chk >= 1000:
+                if chk >= 4:
                     print("warning: " + str(pkt_cnt))
                     cap = True
                     chk = 0
@@ -500,7 +502,7 @@ class ExamDialog(QDialog):
         
         if ri_cnt == 10: #오른쪽으로 벗어난 경우 
             #self.save_img() # 이미지 캡쳐
-            self.save_mp4() # 영상으로 캡처 (로그마다)
+            self.save_mp4(0) # 영상으로 캡처 (로그마다)
             log_msg = "오른쪽을 봤습니다."
             time = datetime.now().strftime("%Y-%m-%d(%H:%M:%S)")
             log_list.append([time, log_msg])
@@ -511,7 +513,7 @@ class ExamDialog(QDialog):
             ri_cnt = 0
         elif le_cnt == 10: #왼쪽으로 벗어난 경우
             #self.save_img()
-            self.save_mp4()
+            self.save_mp4(0)
             log_msg = "왼쪽을 봤습니다."
             time = datetime.now().strftime("%Y-%m-%d(%H:%M:%S)")
             log_list.append([time, log_msg])
@@ -564,8 +566,8 @@ class ExamDialog(QDialog):
             filename = "capture/Webcam_{}.png".format(hour)
             cv2.imwrite(filename, frame, params=[cv2.IMWRITE_PNG_COMPRESSION, 0])
 
-    def save_mp4(self): # 경고 받으면 영상으로 캡처 -> image폴더에 날짜와 저장됨
-        hour = datetime.now().strftime("%Y-%m-%d(%H:%M:%S)")
+    def save_mp4(self, type): # 경고 받으면 영상으로 캡처 -> image폴더에 날짜와 저장됨
+        hour = datetime.now().strftime("%Y-%m-%d(%H-%M-%S)")
         filepath = 'capture/Webcam_{}.avi'.format(hour)
         fps = 20.0
         fourcc = cv2.VideoWriter_fourcc(*'DIVX')
@@ -581,37 +583,12 @@ class ExamDialog(QDialog):
             if ret:
                 out.write(frame)
                 save_cnt += 1
-                if save_cnt == 35:
-                    break
-            else:
-                break
-        out.release()
-
-    def save_mp4_long(self): # 경고 받으면 영상으로 캡처 -> image폴더에 날짜와 저장됨
-        hour = datetime.now().strftime("%Y-%m-%d(%H:%M:%S)")
-        filepath = 'capture/Webcam_{}.avi'.format(hour)
-        fps = 20.0
-        fourcc = cv2.VideoWriter_fourcc(*'DIVX')
-        width = webcam.get(cv2.CAP_PROP_FRAME_WIDTH)
-        height = webcam.get(cv2.CAP_PROP_FRAME_HEIGHT)
-        size = (int(width), int(height))
-        out = cv2.VideoWriter(filepath, fourcc, fps, size)
-        global frame
-        
-        save_cnt = 0
-        while True:
-            ret, frame = webcam.read()
-            if ret:
-                out.write(frame)
-                save_cnt += 1
-                if save_cnt == 50:
-                    msg = QMessageBox()
-                    msg.setWindowIcon(QIcon(img_path + "alert.png"))
-                    msg.setWindowTitle("알림")
-                    msg.setIconPixmap(QPixmap(img_path + "warning.png").scaled(40, 40))
-                    msg.setText("경고")
-                    msg.setInformativeText("녹화가 완료되었습니다.")
-                    break
+                if type == 0:
+                    if save_cnt == 35:
+                        break
+                elif type ==1:
+                    if save_cnt == 200:
+                        break
             else:
                 break
         out.release()
@@ -620,5 +597,9 @@ class ExamDialog(QDialog):
         self.camLabel.setPixmap(QPixmap(img_path + "cam.png"))
         self.camLabel.setScaledContents(True)
         
+        global webcam
         if webcam != None:
+            if webcam.isOpened():
+                self.stream.close()
+                print("stream close")
             webcam.release()

@@ -1,14 +1,15 @@
 import cv2, qimage2ndarray
-import numpy as np
 import mediapipe as mp
-import multiprocessing as multi
-import socket
+from requests import get
 from scapy.all import *
 from PIL import ImageGrab
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
+import pyrebase
+import json
+from src.settings import *
 from eyetracking.gaze_tracking import GazeTracking
 mp_face_detection = mp.solutions.face_detection
 mp_face_mesh = mp.solutions.face_mesh
@@ -36,6 +37,15 @@ approv = False
 cap = False
 chk = 0
 HOST = socket.gethostbyname(socket.gethostname())
+with open("firebase/auth.json") as f:
+            config = json.load(f)
+firebase = pyrebase.initialize_app(config)
+# Get a reference to the auth service
+auth = firebase.auth()
+# Get a reference to the database service
+db = firebase.database()
+global group
+group = False
 
 class ExamDialog(QDialog):
     def __init__(self):
@@ -230,156 +240,198 @@ class ExamDialog(QDialog):
         LEFT_IRIS = [474,475, 476, 477]
         RIGHT_IRIS = [469, 470, 471, 472]
         """
+        self.stream = db.child("users").stream(self.stream_handler)
         
-        while webcam.isOpened():
-            # We get a new frame from the webcam
-            global ret, frame
-            global alert_le, alert_ri, alert_emp, alert_two
-            ret, frame = webcam.read()
+        try:
+            while webcam.isOpened():
+                # We get a new frame from the webcam
+                global ret, frame
+                global alert_le, alert_ri, alert_emp, alert_two
+                ret, frame = webcam.read()
 
-            # 만약 카메라가 연결되어 있지 않으면 while 반복문 종료
-            if not ret:
-                msg.setIconPixmap(QPixmap(img_path + "info.png").scaled(40, 40))
-                msg.setText("오류")
-                msg.setInformativeText("웹캠을 찾을 수 없습니다.")
-                msg.exec_()
-                self.endWebcam()
-                break
-            
-            # 보기 편하기 위해 이미지를 좌우를 반전하고, BGR 이미지를 RGB로 변환
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            # 성능을 향상시키려면 이미지를 작성 여부를 False으로 설정
-            # 영상에 얼굴 감지 주석 그리기 기본값 : True
-            frame.flags.writeable = True
-            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-            #getting width and height or frame
-            #img_h, img_w = frame.shape[:2]
-            
-            with mp_face_detection.FaceDetection( #얼굴인식
-                model_selection = 0,
-                min_detection_confidence = 0.5
-                ) as face_detection:
-                    d_results = face_detection.process(frame)
+                # 만약 카메라가 연결되어 있지 않으면 while 반복문 종료
+                if not ret:
+                    msg.setIconPixmap(QPixmap(img_path + "info.png").scaled(40, 40))
+                    msg.setText("오류")
+                    msg.setInformativeText("웹캠을 찾을 수 없습니다.")
+                    msg.exec_()
+                    self.endWebcam()
+                    break
 
-                    # 자리 비움 감지
-                    if d_results.detections: # 사람 있음
-                        #for detection in d_results.detections: # 주석 그리기
-                            #mp_drawing.draw_detection(frame, detection)
-                        if len(d_results.detections) >= 2: # 사람 2명 이상
-                            if ((datetime.now() - t_alert_time).seconds) > 10:                                #self.save_img() # 이미지 저장을 원하면 주석 해제
+                # 보기 편하기 위해 이미지를 좌우를 반전하고, BGR 이미지를 RGB로 변환
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                # 성능을 향상시키려면 이미지를 작성 여부를 False으로 설정
+                # 영상에 얼굴 감지 주석 그리기 기본값 : True
+                frame.flags.writeable = True
+                frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                #getting width and height or frame
+                #img_h, img_w = frame.shape[:2]
+                
+                with mp_face_detection.FaceDetection( #얼굴인식
+                    model_selection = 0,
+                    min_detection_confidence = 0.5
+                    ) as face_detection:
+                        d_results = face_detection.process(frame)
+
+                        # 자리 비움 감지
+                        if d_results.detections: # 사람 있음
+                            #for detection in d_results.detections: # 주석 그리기
+                                #mp_drawing.draw_detection(frame, detection)
+                            if len(d_results.detections) >= 2: # 사람 2명 이상
+                                if ((datetime.now() - t_alert_time).seconds) > 10:                                #self.save_img() # 이미지 저장을 원하면 주석 해제
+                                    self.save_mp4() # 동영상 저장을 원하면 주석 해제
+                                    alert_two += 0.4
+                                    log_msg = "외부인이 감지됐습니다."
+                                    time = datetime.now().strftime("%Y-%m-%d(%H:%M:%S)")
+                                    log_list.append(time + " " +log_msg)
+                                    self.alertListWidget.addItem(time + " " + log_msg)
+                                    self.alertListWidget.scrollToBottom()
+                                    self.alert_show()
+                                t_alert_time = datetime.now()
+                        else: # 사람 없음
+                            if ((datetime.now() - e_alert_time).seconds) > 10:
+                                #self.save_img() # 이미지 저장을 원하면 주석 해제
                                 self.save_mp4() # 동영상 저장을 원하면 주석 해제
-                                alert_two += 0.4
-                                log_msg = "외부인이 감지됐습니다."
+                                alert_emp += 0.4
+                                log_msg = "자리를 비우지 마세요."
                                 time = datetime.now().strftime("%Y-%m-%d(%H:%M:%S)")
                                 log_list.append(time + " " +log_msg)
-                                self.alertListWidget.addItem(time + " " + log_msg)
+                                self.alertListWidget.addItem(time + " " +log_msg)
                                 self.alertListWidget.scrollToBottom()
                                 self.alert_show()
-                            t_alert_time = datetime.now()
-                    else: # 사람 없음
-                        if ((datetime.now() - e_alert_time).seconds) > 10:
-                            #self.save_img() # 이미지 저장을 원하면 주석 해제
-                            self.save_mp4() # 동영상 저장을 원하면 주석 해제
-                            alert_emp += 0.4
-                            log_msg = "자리를 비우지 마세요."
-                            time = datetime.now().strftime("%Y-%m-%d(%H:%M:%S)")
-                            log_list.append(time + " " +log_msg)
-                            self.alertListWidget.addItem(time + " " +log_msg)
-                            self.alertListWidget.scrollToBottom()
-                            self.alert_show()
-                        e_alert_time = datetime.now()
+                            e_alert_time = datetime.now()
 
-            # GazeTracking
-            # We send this frame to GazeTracking to analyze it
-            gaze.refresh(frame)
-            frame = gaze.annotated_frame()
+                # GazeTracking
+                # We send this frame to GazeTracking to analyze it
+                gaze.refresh(frame)
+                frame = gaze.annotated_frame()
 
-            Hdir = "horizontal direction"
-            Vdir = "vertical direction"
-            if gaze.is_right():
-                Hdir = "Looking right"
-                global ri_cnt
-                ri_temp = ri_cnt
-                ri_temp += 1
-                ri_cnt = ri_temp
-                self.vision_track()
-            elif gaze.is_left():
-                Hdir = "Looking left"
-                global le_cnt
-                le_temp = le_cnt
-                le_temp += 1
-                le_cnt = le_temp
-                self.vision_track()
-            elif gaze.is_center():
-                Hdir = "Looking center"
-            
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            """
-            cv2.putText(frame, Hdir, (90, 400), cv2.FONT_HERSHEY_DUPLEX, 1.2, (7, 163, 183), 2)
-            cv2.putText(frame, Vdir, (90, 450), cv2.FONT_HERSHEY_DUPLEX, 1.2, (7, 163, 183), 2)
-            left_pupil = gaze.pupil_left_coords()
-            right_pupil = gaze.pupil_right_coords()
-            down_pupil = gaze.pupil_down_coords()
-            cv2.putText(frame, "left pupil:  " + str(left_pupil), (340, 50), cv2.FONT_HERSHEY_DUPLEX, 0.8, (7, 163, 183), 1)
-            cv2.putText(frame, "right pupil: " + str(right_pupil), (340, 85), cv2.FONT_HERSHEY_DUPLEX, 0.8, (7, 163, 183), 1)
-            cv2.putText(frame, "is down: " + str(down_pupil), (340, 120), cv2.FONT_HERSHEY_DUPLEX, 0.8, (7, 163, 183), 1)
-            """
-
-            """
-            # mediapipe iris
-            with mp_face_mesh.FaceMesh(
-                max_num_faces=1,
-                refine_landmarks=True,
-                min_detection_confidence=0.6,
-                min_tracking_confidence=0.6
-            ) as face_mesh:
-                m_results = face_mesh.process(frame)
-                if m_results.multi_face_landmarks:
-                    mesh_points=np.array([np.multiply([p.x, p.y], [img_w, img_h]).astype(int)
-                    for p in m_results.multi_face_landmarks[0].landmark])
+                Hdir = "horizontal direction"
+                Vdir = "vertical direction"
+                if gaze.is_right():
+                    Hdir = "Looking right"
+                    global ri_cnt
+                    ri_temp = ri_cnt
+                    ri_temp += 1
+                    ri_cnt = ri_temp
+                    self.vision_track()
+                elif gaze.is_left():
+                    Hdir = "Looking left"
+                    global le_cnt
+                    le_temp = le_cnt
+                    le_temp += 1
+                    le_cnt = le_temp
+                    self.vision_track()
+                elif gaze.is_center():
+                    Hdir = "Looking center"
                 
-                    (l_cx, l_cy), l_radius = cv2.minEnclosingCircle(mesh_points[LEFT_IRIS])
-                    (r_cx, r_cy), r_radius = cv2.minEnclosingCircle(mesh_points[RIGHT_IRIS])
-                    # turn center points into np array 
-                    center_left = np.array([l_cx, l_cy], dtype=np.int32)
-                    center_right = np.array([r_cx, r_cy], dtype=np.int32)
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                """
+                cv2.putText(frame, Hdir, (90, 400), cv2.FONT_HERSHEY_DUPLEX, 1.2, (7, 163, 183), 2)
+                cv2.putText(frame, Vdir, (90, 450), cv2.FONT_HERSHEY_DUPLEX, 1.2, (7, 163, 183), 2)
+                left_pupil = gaze.pupil_left_coords()
+                right_pupil = gaze.pupil_right_coords()
+                down_pupil = gaze.pupil_down_coords()
+                cv2.putText(frame, "left pupil:  " + str(left_pupil), (340, 50), cv2.FONT_HERSHEY_DUPLEX, 0.8, (7, 163, 183), 1)
+                cv2.putText(frame, "right pupil: " + str(right_pupil), (340, 85), cv2.FONT_HERSHEY_DUPLEX, 0.8, (7, 163, 183), 1)
+                cv2.putText(frame, "is down: " + str(down_pupil), (340, 120), cv2.FONT_HERSHEY_DUPLEX, 0.8, (7, 163, 183), 1)
+                """
+
+                """
+                # mediapipe iris
+                with mp_face_mesh.FaceMesh(
+                    max_num_faces=1,
+                    refine_landmarks=True,
+                    min_detection_confidence=0.6,
+                    min_tracking_confidence=0.6
+                ) as face_mesh:
+                    m_results = face_mesh.process(frame)
+                    if m_results.multi_face_landmarks:
+                        mesh_points=np.array([np.multiply([p.x, p.y], [img_w, img_h]).astype(int)
+                        for p in m_results.multi_face_landmarks[0].landmark])
                     
-                    # iris
-                    cv2.circle(frame, center_left, int(l_radius), (255,0,255), 2, cv2.LINE_AA)
-                    cv2.circle(frame, center_right, int(r_radius), (255,0,255), 2, cv2.LINE_AA)
-            """
+                        (l_cx, l_cy), l_radius = cv2.minEnclosingCircle(mesh_points[LEFT_IRIS])
+                        (r_cx, r_cy), r_radius = cv2.minEnclosingCircle(mesh_points[RIGHT_IRIS])
+                        # turn center points into np array 
+                        center_left = np.array([l_cx, l_cy], dtype=np.int32)
+                        center_right = np.array([r_cx, r_cy], dtype=np.int32)
+                        
+                        # iris
+                        cv2.circle(frame, center_left, int(l_radius), (255,0,255), 2, cv2.LINE_AA)
+                        cv2.circle(frame, center_right, int(r_radius), (255,0,255), 2, cv2.LINE_AA)
+                """
 
-            #image = qimage2ndarray.array2qimage(cv2.flip(frame, 1)) # 이미지 반전을 원하면 주석을 해제
-            image = qimage2ndarray.array2qimage(frame)
-            self.camLabel.setPixmap(QPixmap(image))
-            self.camLabel.setScaledContents(True) # 레이블이 사용 가능한 모든 공간을 채우기 위해 내용의 크기를 조정할지를 설정
-            
-            global cap, alert_int
+                #image = qimage2ndarray.array2qimage(cv2.flip(frame, 1)) # 이미지 반전을 원하면 주석을 해제
+                image = qimage2ndarray.array2qimage(frame)
+                self.camLabel.setPixmap(QPixmap(image))
+                self.camLabel.setScaledContents(True) # 레이블이 사용 가능한 모든 공간을 채우기 위해 내용의 크기를 조정할지를 설정
+                
+                global cap, alert_int
 
-            lock.acquire()
-            threading.Thread(target = self.pktcap).start()
-            lock.release()
-            threading.Thread(target = self.printcnt).start()
+                #lock.acquire()
+                #threading.Thread(target = self.pktcap).start()
+                #lock.release()
+                #threading.Thread(target = self.printcnt).start()
 
-            """
-            if cap == True:
-                cap_time = datetime.now().strftime("%Y-%m-%d(%H-%M-%S)")
-                img = ImageGrab.grab()
-                filename = "capture/screenshot/screenshot_{}.png".format(cap_time)
-                img.save(filename)
-                alert_int += 0.2
-                log_msg = "인터넷 활동이 감지됐습니다."
-                time = datetime.now().strftime("%Y-%m-%d(%H:%M:%S)")
-                log_list.append(time + " " +log_msg)
-                self.alertListWidget.addItem(time + " " + log_msg)
-                self.alertListWidget.scrollToBottom()
-                self.alert_show()
-                cap = False
-            """
+                if cap == True:
+                    cap_time = datetime.now().strftime("%Y-%m-%d(%H-%M-%S)")
+                    img = ImageGrab.grab()
+                    filename = "capture/screenshot/screenshot_{}.png".format(cap_time)
+                    img.save(filename)
+                    alert_int += 0.2
+                    log_msg = "인터넷 활동이 감지됐습니다."
+                    time = datetime.now().strftime("%Y-%m-%d(%H:%M:%S)")
+                    log_list.append(time + " " +log_msg)
+                    self.alertListWidget.addItem(time + " " + log_msg)
+                    self.alertListWidget.scrollToBottom()
+                    self.alert_show()
+                    cap = False
 
-            if cv2.waitKey(10) == ord('q'):
-                self.endWebcam()
-                break
+                global group
+                if group == True:
+                    self.save_mp4()
+                    group = False
+
+                if cv2.waitKey(10) == ord('q'):
+                    self.endWebcam()
+                    break
+        except:
+            settings.expireInfo()
+            print("Exiting")
+
+    def stream_handler(self, message):
+        # We only care if something changed
+        if message["event"] in ("put", "patch"):
+            print("Something changed")
+            self.chkgrouptest()
+
+    def chkgrouptest(self):
+        host_ip = settings.ip
+        ip_list = []
+        
+        all_users = db.child("users").get()
+        for user in all_users.each():
+            uid = user.key()
+            if uid != settings.uid:
+                login = db.child("users").child(uid).child("login").get().val()
+                if login == True:
+                    ip_list.append(db.child("users").child(uid).child("ip").get().val())
+        print(ip_list)
+        
+        cnt_ip = ip_list.count(host_ip)
+        if cnt_ip > 0:
+            msg = QMessageBox()
+            msg.setWindowIcon(QIcon(img_path + "alert.png"))
+            msg.setWindowTitle("알림")
+            msg.setIconPixmap(QPixmap(img_path + "warning.png").scaled(40, 40))
+            msg.setText("경고")
+            msg.setInformativeText("같은 장소에 타응시생이 있음이 감지되어 감독관에게 알림이 갔습니다.\n"
+                                   "지금부터 카메라를 이용하여 주변을 360도 각도로 촬영하여 사람이 없음을 녹화해주세요."
+                                   "OK 버튼을 누르면 자동으로 10초간 녹화가 진행됩니다.\n"
+                                   "※ 녹화를 하지 않을 시 추후에 불이익이 발생할 수 있습니다.")
+            msg.exec_()
+            global group
+            group = True
 
     def pktcap(self):
         sniff(filter = "ip", prn = self.cntpacket, count = 5)
@@ -389,7 +441,7 @@ class ExamDialog(QDialog):
         src_ip = packet[0][1].src
         dst_ip = packet[0][1].dst
         proto = packet[0][1].proto
-
+        
         l_host_ip = HOST.split(".")
         del(l_host_ip[3])
         s_host_ip = ".".join(l_host_ip)
@@ -421,31 +473,24 @@ class ExamDialog(QDialog):
             if approv == True:
                 approv = False
             else:
-                if pkt_cnt > 80:
-                    if pkt_cnt > 110:
-                        print("warning: " + str(pkt_cnt))
-                        cap = True
-                        chk = 0
-                    else:
-                        if pkt_cnt > 110:
-                            if chk == 0:
-                                chk = 1
-                            elif chk == 1:
-                                print("warning: " + str(pkt_cnt))
-                                cap = True
-                                chk = 0
-                        else:
-                            if chk == 0:
-                                chk = 1
-                            elif chk == 1:
-                                chk = 2
-                            elif chk == 2:
-                                print("warning: " + str(pkt_cnt))
-                                cap = True
-                                chk = 0
-                elif pkt_cnt < 40:
+                if pkt_cnt > 140:
+                    chk += 4
+                elif pkt_cnt > 110:
+                    chk += 3
+                elif pkt_cnt > 80:
+                    chk += 2
+                elif pkt_cnt > 60:
+                    chk += 1.5
+                elif pkt_cnt > 30:
+                    chk += 1
+                else:
                     chk = 0
-            
+
+                if chk >= 1000:
+                    print("warning: " + str(pkt_cnt))
+                    cap = True
+                    chk = 0
+
             pkt_cnt = 0
             pre_time = time
 
@@ -511,7 +556,7 @@ class ExamDialog(QDialog):
             alert_emp = 0
             alert_two = 0
             alert_int = 0
-                
+    
     def save_img(self): # 경고 받으면 캠 캡처 -> 폴더에 날짜와 저장됨
         global frame
         if ret:
@@ -520,7 +565,7 @@ class ExamDialog(QDialog):
             cv2.imwrite(filename, frame, params=[cv2.IMWRITE_PNG_COMPRESSION, 0])
 
     def save_mp4(self): # 경고 받으면 영상으로 캡처 -> image폴더에 날짜와 저장됨
-        hour = datetime.now().strftime("%H%M%S")
+        hour = datetime.now().strftime("%Y-%m-%d(%H:%M:%S)")
         filepath = 'capture/Webcam_{}.avi'.format(hour)
         fps = 20.0
         fourcc = cv2.VideoWriter_fourcc(*'DIVX')
@@ -530,13 +575,42 @@ class ExamDialog(QDialog):
         out = cv2.VideoWriter(filepath, fourcc, fps, size)
         global frame
         
-        save_cnt=0
+        save_cnt = 0
         while True:
             ret, frame = webcam.read()
             if ret:
                 out.write(frame)
-                save_cnt+=1
-                if save_cnt==35:
+                save_cnt += 1
+                if save_cnt == 35:
+                    break
+            else:
+                break
+        out.release()
+
+    def save_mp4_long(self): # 경고 받으면 영상으로 캡처 -> image폴더에 날짜와 저장됨
+        hour = datetime.now().strftime("%Y-%m-%d(%H:%M:%S)")
+        filepath = 'capture/Webcam_{}.avi'.format(hour)
+        fps = 20.0
+        fourcc = cv2.VideoWriter_fourcc(*'DIVX')
+        width = webcam.get(cv2.CAP_PROP_FRAME_WIDTH)
+        height = webcam.get(cv2.CAP_PROP_FRAME_HEIGHT)
+        size = (int(width), int(height))
+        out = cv2.VideoWriter(filepath, fourcc, fps, size)
+        global frame
+        
+        save_cnt = 0
+        while True:
+            ret, frame = webcam.read()
+            if ret:
+                out.write(frame)
+                save_cnt += 1
+                if save_cnt == 50:
+                    msg = QMessageBox()
+                    msg.setWindowIcon(QIcon(img_path + "alert.png"))
+                    msg.setWindowTitle("알림")
+                    msg.setIconPixmap(QPixmap(img_path + "warning.png").scaled(40, 40))
+                    msg.setText("경고")
+                    msg.setInformativeText("녹화가 완료되었습니다.")
                     break
             else:
                 break
@@ -545,5 +619,6 @@ class ExamDialog(QDialog):
     def endWebcam(self):
         self.camLabel.setPixmap(QPixmap(img_path + "cam.png"))
         self.camLabel.setScaledContents(True)
+        
         if webcam != None:
             webcam.release()

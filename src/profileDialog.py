@@ -2,19 +2,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
-import pyrebase
-import json
 from src.settings import *
-
-img_path = "src/imgsource/"
-
-with open("firebase/auth.json") as f:
-            config = json.load(f)
-firebase = pyrebase.initialize_app(config)
-# Get a reference to the auth service
-auth = firebase.auth()
-# Get a reference to the database service
-db = firebase.database()
 
 
 class ProfileDialog(QDialog):
@@ -23,22 +11,46 @@ class ProfileDialog(QDialog):
         self.setupUI()
 
     def setupUI(self):
-        self.setFixedSize(340, 300)
-        self.setWindowTitle("ChasEye 체이스아이 :: 프로필 설정")
-        self.setWindowIcon(QIcon(img_path + "icon.png"))
+        if settings.admin == False:
+            self.setFixedSize(340, 300)
+        else:
+            self.setFixedSize(340, 260)
+        self.setWindowTitle("BOSWU 보슈 :: 프로필 설정")
+        self.setWindowIcon(QIcon(settings.img_path + "icon.png"))
+
+        # small font
+        smallfont = QFont()
+        smallfont.setPointSize(10)
+        smallfont.setBold(False)
+        smallfont.setWeight(75)
 
         # basic font
-        font = QtGui.QFont()
-        font.setFamily("맑은 고딕")
+        basicfont = QFont()
+        basicfont.setPointSize(12)
+        basicfont.setBold(False)
+        basicfont.setWeight(75)
+        basicfont.setFamily("맑은 고딕")
+        
+        # median font
+        medianfont = QFont()
+        medianfont.setPointSize(14)
+        medianfont.setBold(False)
+        medianfont.setWeight(75)
+        medianfont.setFamily("맑은 고딕")
+
+        # large font
+        largefont = QFont()
+        largefont.setPointSize(18)
+        largefont.setBold(True)
+        largefont.setWeight(75)
+        largefont.setFamily("맑은 고딕")
 
         # label for header
         self.headerLabel = QLabel("프로필 수정")
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        self.headerLabel.setFixedHeight(30)
         self.headerLabel.setSizePolicy(sizePolicy) # 너비 확장 높이 확장
-        font.setPointSize(18)
-        font.setBold(True)
-        font.setWeight(75)
-        self.headerLabel.setFont(font)
+        self.headerLabel.setFont(largefont)
         self.headerLabel.setAlignment(QtCore.Qt.AlignCenter) # 가운데 정렬
         self.headerLabel.setStyleSheet("color: #07A3B7;\n")
 
@@ -47,35 +59,25 @@ class ProfileDialog(QDialog):
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Expanding)
         self.emailIndex.setFixedWidth(90) # 너비 고정
         self.emailIndex.setSizePolicy(sizePolicy) # 너비 고정 높이 고정
-        font.setPointSize(14)
-        font.setBold(True)
-        font.setWeight(75)
-        self.emailIndex.setFont(font)
+        self.emailIndex.setFont(medianfont)
         self.emailIndex.setAlignment(Qt.AlignCenter) # 가운데 정렬
         self.emailIndex.setStyleSheet("background-color: #07A3B7;\n"
                                       "color: #FFF;\n"
                                       "padding : 8px\n")
         # label for email
-        self.emailInput = QLineEdit(settings.email)
-        self.emailInput.setReadOnly(True)
+        self.emailInput = QLabel(settings.email)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         self.emailInput.setFixedHeight(30) # 높이 고정
         self.emailInput.setSizePolicy(sizePolicy) # 너비 확장 높이 고정
-        font.setPointSize(12)
-        font.setBold(True)
-        font.setWeight(75)
-        self.emailInput.setFont(font)
-        self.emailInput.setStyleSheet("border-radius : 10px;\n")
+        self.emailInput.setFont(basicfont)
+        self.emailInput.setStyleSheet("color: #07A3B7;\n")
         
         # label for name
         self.nameIndex = QLabel("이름")
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Expanding)
         self.nameIndex.setFixedWidth(90) # 너비 고정
         self.nameIndex.setSizePolicy(sizePolicy) # 너비 고정 높이 고정
-        font.setPointSize(14)
-        font.setBold(True)
-        font.setWeight(75)
-        self.nameIndex.setFont(font)
+        self.nameIndex.setFont(medianfont)
         self.nameIndex.setAlignment(Qt.AlignCenter) # 가운데 정렬
         self.nameIndex.setStyleSheet("background-color: #07A3B7;\n"
                                       "color: #FFF;\n"
@@ -86,10 +88,7 @@ class ProfileDialog(QDialog):
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         self.nameInput.setFixedHeight(30) # 높이 고정
         self.nameInput.setSizePolicy(sizePolicy) # 너비 확장 높이 고정
-        font.setPointSize(12)
-        font.setBold(True)
-        font.setWeight(75)
-        self.nameInput.setFont(font)
+        self.nameInput.setFont(basicfont)
         self.nameInput.setStyleSheet("border-radius : 10px;\n")
 
         # label for sid
@@ -97,10 +96,7 @@ class ProfileDialog(QDialog):
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Expanding)
         self.sidIndex.setFixedWidth(90) # 너비 고정
         self.sidIndex.setSizePolicy(sizePolicy) # 너비 고정 높이 확장
-        font.setPointSize(14)
-        font.setBold(True)
-        font.setWeight(75)
-        self.sidIndex.setFont(font)
+        self.sidIndex.setFont(medianfont)
         self.sidIndex.setAlignment(Qt.AlignCenter) # 가운데 정렬
         self.sidIndex.setStyleSheet("background-color: #07A3B7;\n"
                                       "color: #FFF;\n"
@@ -111,10 +107,7 @@ class ProfileDialog(QDialog):
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         self.sidInput.setFixedHeight(30) # 높이 고정
         self.sidInput.setSizePolicy(sizePolicy) # 너비 확장 높이 고정
-        font.setPointSize(12)
-        font.setBold(True)
-        font.setWeight(75)
-        self.sidInput.setFont(font)
+        self.sidInput.setFont(basicfont)
         self.sidInput.setStyleSheet("border-radius : 10px;\n")
 
         # label for major
@@ -122,35 +115,26 @@ class ProfileDialog(QDialog):
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.majorIndex.setFixedWidth(90) # 너비 고정
         self.majorIndex.setSizePolicy(sizePolicy) # 너비 고정 높이 확장
-        font.setPointSize(14)
-        font.setBold(True)
-        font.setWeight(75)
-        self.majorIndex.setFont(font)
+        self.majorIndex.setFont(medianfont)
         self.majorIndex.setAlignment(Qt.AlignCenter) # 가운데 정렬
         self.majorIndex.setStyleSheet("background-color: #07A3B7;\n"
                                       "color: #FFF;\n"
                                       "padding : 8px\n")
         # line edit for sid
         self.majorInput = QComboBox()
-        majors = db.child("major").get()
+        majors = settings.db.child("majors").get()
         for major in majors.each():
-            self.majorInput.addItem(major.val())
+            self.majorInput.addItem(major.key())
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         self.majorInput.setFixedHeight(30) # 높이 고정
         self.majorInput.setSizePolicy(sizePolicy) # 너비 확장 높이 고정
-        font.setPointSize(12)
-        font.setBold(False)
-        font.setWeight(75)
-        self.majorInput.setFont(font)
+        self.majorInput.setFont(basicfont)
         self.majorInput.setStyleSheet("border-radius : 10px;\n")        
         self.majorInput.setCurrentText(settings.major)
 
         # button for edit
         self.editBtn = QPushButton("적용")
-        font.setPointSize(14)
-        font.setBold(True)
-        font.setWeight(75)
-        self.editBtn.setFont(font)
+        self.editBtn.setFont(medianfont)
         self.editBtn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor)) # 커서
         self.editBtn.setStyleSheet("background-color : #07A3B7;\n"
                                     "color : #FFF;\n"
@@ -179,9 +163,10 @@ class ProfileDialog(QDialog):
         self.nameBox.addWidget(self.nameIndex)
         self.nameBox.addWidget(self.nameInput)
 
-        self.profileLayout.addLayout(self.sidBox)
-        self.sidBox.addWidget(self.sidIndex)
-        self.sidBox.addWidget(self.sidInput)
+        if settings.admin == False:
+            self.profileLayout.addLayout(self.sidBox)
+            self.sidBox.addWidget(self.sidIndex)
+            self.sidBox.addWidget(self.sidInput)
 
         self.profileLayout.addLayout(self.majorBox)
         self.majorBox.addWidget(self.majorIndex)
@@ -194,22 +179,36 @@ class ProfileDialog(QDialog):
         sid = self.sidInput.text()
         major = self.majorInput.currentText()
 
-        if name != "" and sid != "" and len(sid) == 10:
-            settings.uname = name
-            settings.sid = sid
-            settings.major = major
+        msg = QMessageBox()
+        msg.setWindowIcon(QIcon(settings.img_path + "alert.png"))
+        msg.setWindowTitle("프로필 수정")
+        msg.setIconPixmap(QPixmap(settings.img_path + "fail.png").scaled(40, 40))
+        msg.setText("알림")
+        msg.setInformativeText("양식을 확인해주세요.")
 
-            db.child("users").child(settings.uid).update({
-                "name": settings.uname,
-                "sid": settings.sid,
-                "major": settings.major
-            })
-            self.close()
+        if settings.admin == False:
+            if name != "" and sid != "" and len(sid) == 10:
+                settings.uname = name
+                settings.sid = sid
+                settings.major = major
+
+                settings.db.child("users").child(settings.uid).update({
+                    "name": settings.uname,
+                    "sid": settings.sid,
+                    "major": settings.major
+                })
+                self.close()
+            else:
+                msg.exec_()
         else:
-            msg = QMessageBox()
-            msg.setWindowIcon(QIcon(img_path + "alert.png"))
-            msg.setWindowTitle("프로필 수정")
-            msg.setIconPixmap(QPixmap(img_path + "fail.png").scaled(40, 40))
-            msg.setText("알림")
-            msg.setInformativeText("양식을 확인해주세요.")
-            msg.exec_()
+            if name != "":
+                settings.uname = name
+                settings.major = major
+
+                settings.db.child("users").child(settings.uid).update({
+                    "name": settings.uname,
+                    "major": settings.major
+                })
+                self.close()
+            else:
+                msg.exec_()

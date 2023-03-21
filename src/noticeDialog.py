@@ -2,9 +2,8 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
-from src.examDialog import ExamDialog
-
-img_path = "src/imgsource/"
+from src.camtestDialog import CamtestDialog
+from src.settings import *
 
 
 class NoticeDialog(QDialog):
@@ -14,8 +13,8 @@ class NoticeDialog(QDialog):
 
     def setupUI(self):
         self.resize(680, 420)
-        self.setWindowTitle("ChasEye 체이스아이 :: 공지사항")
-        self.setWindowIcon(QIcon(img_path + "icon.png"))
+        self.setWindowTitle("BOSWU 보슈 :: 주의사항")
+        self.setWindowIcon(QIcon(settings.img_path + "icon.png"))
 
         # basic font
         font = QtGui.QFont()
@@ -36,7 +35,7 @@ class NoticeDialog(QDialog):
         self.startBtn.clicked.connect(self.startBtnClicked)
         
         # label for notice
-        self.header = QtWidgets.QLabel("유의 사항\n")
+        self.header = QtWidgets.QLabel("주의 사항\n")
         font.setPointSize(14)
         font.setBold(True)
         self.header.setFont(font)
@@ -79,5 +78,5 @@ class NoticeDialog(QDialog):
         
     def startBtnClicked(self):
         self.close()
-        dlg = ExamDialog()
+        dlg = CamtestDialog()
         dlg.exec_()

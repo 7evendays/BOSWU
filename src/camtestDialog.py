@@ -53,6 +53,8 @@ class CamtestDialog(QDialog):
         self.resize(720, 480)
         self.setWindowTitle("BOSWU 보슈 :: 카메라 테스트")
         self.setWindowIcon(QIcon(settings.img_path + "icon.png"))
+        settings.setInfo()
+        print(settings.r_std, settings.l_std, settings.d_std)
         
         # basic font
         font = QtGui.QFont()
@@ -245,7 +247,7 @@ class CamtestDialog(QDialog):
             self.startWebcam(1)
 
     def caliinitBtnClicked(self):
-        settings.updatecali(0.46, 0.64, 0.74)
+        settings.updatecali(settings.r_std, settings.l_std, settings.d_std)
 
     def camonBtnClicked(self):
         if webcam != None and webcam.isOpened():
@@ -338,14 +340,52 @@ class CamtestDialog(QDialog):
                             e_alert_time = datetime.now()
 
                         global ri_cnt, le_cnt, dw_cnt
-                        hdir, vdir = eyetracking(frame)
-                        if vdir != "blink":
-                            if hdir == "right":
+                        hdir, vdir, vr_ratio = eyetracking(frame)
+                        if hdir == "right":
+                            le_cnt = 0
+                            ri_temp = ri_cnt
+                            ri_temp += 1
+                            ri_cnt = ri_temp
+                            self.cntalert()
+                        elif hdir == "left":
+                            ri_cnt = 0
+                            le_temp = le_cnt
+                            le_temp += 1
+                            le_cnt = le_temp
+                            self.cntalert()
+
+                        """
+                        if vdir != "blink": # 눈을 감지 않았을 때
+                            if vdir == "down" and hdir != "right" and hdir != "left":
+                                ri_cnt = 0
                                 le_cnt = 0
+                                if (vr_ratio > 0.8 and vr_ratio < 1.2):
+                                    dw_temp = dw_cnt
+                                    dw_temp += 2
+                                    dw_cnt = dw_temp
+                                    self.cntalert()
+                                elif (vr_ratio > 0.75):
+                                    dw_temp = dw_cnt
+                                    dw_temp += 1.5
+                                    dw_cnt = dw_temp
+                                    self.cntalert()
+                                elif (vr_ratio > 0.7):
+                                    dw_temp = dw_cnt
+                                    dw_temp += 1
+                                    dw_cnt = dw_temp
+                                    self.cntalert()
+                                elif (vr_ratio > 0.64):
+                                    dw_temp = dw_cnt
+                                    dw_temp += 0.5
+                                    dw_cnt = dw_temp
+                                    self.cntalert()
+                            elif hdir == "right":
+                                le_cnt = 0
+                                dw_cnt = 0
                                 ri_temp = ri_cnt
                                 ri_temp += 1
                                 ri_cnt = ri_temp
-                                self.cntalert()
+                                self.cntalert()                                
                             elif hdir == "left":
                                 ri_cnt = 0
                                 dw_cnt = 0
@@ -356,15 +396,13 @@ class CamtestDialog(QDialog):
                             elif hdir == "center":
                                 ri_cnt = 0
                                 le_cnt = 0
-                                if vdir == "down":
-                                    dw_temp = dw_cnt
-                                    dw_temp += 1
-                                    dw_cnt = dw_temp
-                                    self.cntalert()
-                                elif vdir == "center":
-                                    dw_cnt = 0
-                        else:
-                            dw_cnt = 0
+                                if vdir == "center" or vdir == "blink":
+                                    dw_cnt = 0;
+                        else: # 눈을 감으면
+                            le_cnt = 0;
+                            ri_cnt = 0;
+                            dw_cnt = 0;
+                        """
                     except:
                         self.endWebcam()
                         break
@@ -654,8 +692,10 @@ class CamtestDialog(QDialog):
             self.alertListWidget.scrollToBottom()
             alert_ri += 0.2
             self.alert_show()
+            dw_cnt = 0
             ri_cnt = 0
-        elif le_cnt == 15: # 화면 밖 왼쪽 응시
+            ri_cnt = 0
+        elif le_cnt == 8: # 화면 밖 왼쪽 응시
             #self.save_img()
             self.save_mp4(0)
             log_msg = "왼쪽을 봤습니다."
@@ -665,8 +705,10 @@ class CamtestDialog(QDialog):
             self.alertListWidget.scrollToBottom()
             alert_le += 0.2
             self.alert_show()
+            ri_cnt = 0
+            dw_cnt = 0
             le_cnt = 0
-        elif dw_cnt == 5: # 아래 응시
+        elif dw_cnt == 8: # 아래 응시
             #self.save_img()
             self.save_mp4(0)
             log_msg = "아래를 봤습니다."

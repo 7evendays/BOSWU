@@ -20,9 +20,9 @@ def iris_position(iris_center, right_point, left_point, r_std, l_std):
     ratio = center_to_right_d / total_d
 
     iris_position = ""
-    if ratio < r_std:
+    if ratio <= r_std:
         iris_position = "right"
-    elif ratio > l_std:
+    elif ratio >= l_std:
         iris_position = "left"
     else:
         iris_position = "center"
@@ -41,7 +41,7 @@ def is_down(iris_center, top_point, bottom_point, d_std):
         iris_position = "blink"
     else:
         iris_position = "center"
-
+    
     return iris_position, ratio
 
 
@@ -86,10 +86,10 @@ def eyetracking(frame):
             cv2.circle(frame, mesh_points[R_H_RIGHT][0], 2, (255, 255, 255), -1, cv2.LINE_AA) # 오른쪽 눈 오른쪽 끝
             cv2.circle(frame, mesh_points[R_H_LEFT][0], 2, (0, 255, 255), -1, cv2.LINE_AA) # 오른쪽 눈 왼쪽 끝
 
-            hr_iris_pos, ratio = iris_position(center_right, mesh_points[R_H_RIGHT][0], mesh_points[R_H_LEFT][0], settings.r_std, settings.l_std)
-            cv2.putText(frame, f"horizontal(right eye): {hr_iris_pos} {ratio: .2f}", (30, 30), cv2.FONT_HERSHEY_PLAIN, 1.2, (0, 255, 0), 1, cv2.LINE_AA)
-            vr_iris_pos, ratio = is_down(center_right, mesh_points[R_V_TOP][0], mesh_points[R_V_BOTTOM][0], settings.d_std)
-            cv2.putText(frame, f"vertical(right eye): {vr_iris_pos} {ratio: .2f}", (30, 60), cv2.FONT_HERSHEY_PLAIN, 1.2, (0, 255, 0), 1, cv2.LINE_AA)
+            hr_iris_pos, hr_ratio = iris_position(center_right, mesh_points[R_H_RIGHT][0], mesh_points[R_H_LEFT][0], settings.r_std, settings.l_std)
+            cv2.putText(frame, f"horizontal(right eye): {hr_iris_pos} {hr_ratio: .2f}", (30, 30), cv2.FONT_HERSHEY_PLAIN, 1.2, (0, 255, 0), 1, cv2.LINE_AA)
+            vr_iris_pos, vr_ratio = is_down(center_right, mesh_points[R_V_TOP][0], mesh_points[R_V_BOTTOM][0], settings.d_std)
+            cv2.putText(frame, f"vertical(right eye): {vr_iris_pos} {vr_ratio: .2f}", (30, 60), cv2.FONT_HERSHEY_PLAIN, 1.2, (0, 255, 0), 1, cv2.LINE_AA)
             
             # 왼쪽 눈
             #cv2.circle(frame, center_left, 2, (255, 255, 255), -1, cv2.LINE_AA) # 오른쪽 눈 중심
@@ -103,7 +103,7 @@ def eyetracking(frame):
 
             #print(f"r_std: {settings.r_std: .2f} l_std: {settings.l_std: .2f} d_std: {settings.d_std: .2f}")
 
-            return hr_iris_pos, vr_iris_pos
+            return hr_iris_pos, vr_iris_pos, vr_ratio
 
 def facedetection(frame):
     with mp_face_detection.FaceDetection( #얼굴인식
@@ -112,8 +112,6 @@ def facedetection(frame):
         ) as face_detection:
             
             d_results = face_detection.process(frame)
-            
-            print(type(d_results.detections))
 
             # 자리 비움 감지
             if d_results.detections: # 사람 있음

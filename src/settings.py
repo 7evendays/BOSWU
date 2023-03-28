@@ -13,6 +13,9 @@ class settings():
     global major
     global verified
     global ref
+    global r_std
+    global l_std
+    global d_std
 
     img_path = "src/imgsource/"
 
@@ -46,9 +49,9 @@ class settings():
         settings.sid = None
         settings.major = None
         settings.ip = None
-        settings.r_std = 0.64
-        settings.l_std = 0.46
-        settings.d_std = 0.74
+        settings.r_std = 0.42
+        settings.l_std = 0.66
+        settings.d_std = 0.64
         
     def setInfo():
         settings.uid = settings.login["localId"]
@@ -57,11 +60,10 @@ class settings():
             "ip": settings.HOST
         })
         settings.admin = settings.db.child("users").child(settings.uid).child("admin").get().val()
-        if settings.admin == False:
-            settings.sid = settings.db.child("users").child(settings.uid).child("sid").get().val()
-            settings.r_std = settings.db.child("users").child(settings.uid).child("eys").child("r_std").get().val()
-            settings.l_std = settings.db.child("users").child(settings.uid).child("eys").child("l_std").get().val()
-            settings.d_std = settings.db.child("users").child(settings.uid).child("eys").child("d_std").get().val()
+        settings.sid = settings.db.child("users").child(settings.uid).child("sid").get().val()
+        settings.r_std = settings.db.child("users").child(settings.uid).child("eye").child("r_std").get().val()
+        settings.l_std = settings.db.child("users").child(settings.uid).child("eye").child("l_std").get().val()
+        settings.d_std = settings.db.child("users").child(settings.uid).child("eye").child("d_std").get().val()
 
         settings.email = settings.db.child("users").child(settings.uid).child("email").get().val()
         settings.uname = settings.db.child("users").child(settings.uid).child("name").get().val()
@@ -72,7 +74,7 @@ class settings():
     def updatecali(r_std, l_std, d_std):
         settings.uid = settings.login["localId"]
         
-        settings.db.child("users").child("student").child(settings.uid).child("eye").update({
+        settings.db.child("users").child(settings.uid).child("eye").update({
             "r_std": round(r_std, 2),
             "l_std": round(l_std, 2),
             "d_std": round(d_std, 2)

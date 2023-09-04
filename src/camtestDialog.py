@@ -295,11 +295,6 @@ class CamtestDialog(QDialog):
             while webcam.isOpened():
                 # We get a new frame from the webcam
                 ret, frame = webcam.read()
-                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                frame = cv2.flip(frame, 1) # 좌우반전
-                # 성능을 향상시키려면 이미지를 작성 여부를 False으로 설정
-                # 영상에 얼굴 감지 주석 그리기 기본값 : True
-                frame.flags.writeable = True
 
                 # 만약 카메라가 연결되어 있지 않으면 while 반복문 종료
                 if not ret:
@@ -309,6 +304,12 @@ class CamtestDialog(QDialog):
                     msg.exec_()
                     self.endWebcam()
                     break
+
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                frame = cv2.flip(frame, 1) # 좌우반전
+                # 성능을 향상시키려면 이미지를 작성 여부를 False으로 설정
+                # 영상에 얼굴 감지 주석 그리기 기본값 : True
+                frame.flags.writeable = False
                 
                 if mode == 0:
                     try:
